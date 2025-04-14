@@ -1,0 +1,231 @@
+#include <iostream>
+#include "raylib.h"
+#include <string>
+#include <vector>
+#include <algorithm>
+#include <array>
+using namespace std;
+
+struct Position {
+    int x, y;
+};
+
+struct FoundWord {
+    vector<Position> positions;
+    int colorIndex;
+};
+
+float startX = 75;  // The X-coordinate of the top-left corner of the grid
+float startY = 75;  // The Y-coordinate of the top-left corner of the grid
+
+const int margin = 40;
+const int fontSize = 36;
+const int gridSize = 10;
+const int cellSize = 40;
+const int screenWidth = (2 * startX) + (gridSize * cellSize + margin * 2);
+const int screenHeight = (2 * startY) + (gridSize * cellSize + margin * 2);
+
+// Define the spacing between cells
+float spacing = 0;
+
+char letterGrid[gridSize][gridSize] = {
+    {'E','L','O','P','D','C','I','T','N','E'},
+    {'V','I','C','S','A','P','G','R','A','N'},
+    {'E','D','O','U','I','G','L','L','H','A'},
+    {'N','U','M','O','N','T','L','E','T','M'},
+    {'A','N','I','N','S','B','A','P','E','R'},
+    {'I','N','I','A','K','E','T','N','E','D'},
+    {'N','E','L','O','N','S','K','I','R','N'},
+    {'G','A','T','I','Y','A','U','S','L','E'},
+    {'I','I','S','O','L','S','Z','E','C','T'},
+    {'E','R','E','V','E','S','E','L','O','N'}
+};
+
+bool isStartLetter[gridSize][gridSize] = { false };
+bool selected[gridSize][gridSize] = { false };
+bool locked[gridSize][gridSize] = { false };
+
+array<Color, 10> wordColors = {RED, ORANGE, YELLOW, SKYBLUE, DARKBLUE, PURPLE, DARKPURPLE, BEIGE, DARKBROWN};
+
+vector<Position> selectedPositions;
+
+bool isValidSelection(const std::vector<Position>& selected, const char board[10][10], const std::vector<std::string>& wordList) {
+    std::string word;
+    for (const auto& pos : selected) {
+        word += board[pos.y][pos.x];
+    }
+
+    cout << word << endl;
+
+    // Check if word exists in the wordList
+    return std::find(wordList.begin(), wordList.end(), word) != wordList.end();
+}
+
+string finalAnswerInput;
+const string finalAnswer = "DIGITALIZE";
+bool answerSubmitted = false;
+bool correctAnswer = false;
+
+
+int main() {
+
+    int maxAnswerLength = 10;
+
+    vector<FoundWord> foundWords;
+    int nextColorIndex = 0;
+
+    Font myFont = GetFontDefault();
+
+    vector<string> validWords = {"CODEVELOP", "PAINTBALL", "LETHARGIC", "UNANIMOUS", "SNAKESKIN", "PERMANENT", "LINEATION", "USELESSLY", "SOVEREIGN", "CONTENDER"};
+
+    isStartLetter[1][2] = true;
+    isStartLetter[1][5] = true;
+    isStartLetter[2][7] = true;
+    isStartLetter[3][1] = true;
+    isStartLetter[4][4] = true;
+    isStartLetter[4][7] = true;
+    isStartLetter[6][2] = true;
+    isStartLetter[7][6] = true;
+    isStartLetter[8][2] = true;
+    isStartLetter[8][8] = true;
+
+
+
+    InitWindow(screenWidth, screenHeight, "Word Snakes");
+    SetTargetFPS(60);
+
+    while (!WindowShouldClose()) {
+        BeginDrawing();
+        ClearBackground(LIME);
+
+        int totalGridWidth = gridSize * cellSize + (gridSize - 1) * spacing;
+        float startX = (screenWidth - totalGridWidth) / 2.0f;
+        int textboxWidth = 300;
+        int textboxHeight = 50;
+        float textboxX = (screenWidth - textboxWidth) / 2.0f;
+        float textboxY = screenHeight - 100;
+
+        for (int y = 0; y < gridSize; y++) {
+            for (int x = 0; x < gridSize; x++) {
+
+                char letter = letterGrid[y][x];
+                const char* letterStr = TextFormat("%c", letter);
+
+
+                float posX = startX + x * (cellSize + spacing);
+                float posY = startY + y * (cellSize + spacing);
+
+                Vector2 textSize = MeasureTextEx(myFont, letterStr, fontSize, 2);
+
+                float posXCentered = posX + (cellSize - textSize.x) / 2;
+                float posYCentered = posY + (cellSize - textSize.y) / 2;
+
+                posXCentered += -16;
+                posYCentered += -16;
+                
+                if (isStartLetter[y][x]) {
+                    DrawRectangle(posX, posY, cellSize, cellSize, DARKGREEN);
+                    DrawRectangleLines(posX, posY, cellSize, cellSize, BLACK);
+                } else {
+                    DrawRectangleLines(posX, posY, cellSize, cellSize, BLACK);
+                }
+
+                // Highlight completed word positions
+                for (const auto& word : foundWords) {
+                    for (const auto& pos : word.positions) {
+                        if (x == pos.x && y == pos.y) {
+                            DrawRectangle(posX, posY, cellSize, cellSize, Fade(wordColors[word.colorIndex], 0.5f));
+                        }
+                    }
+                }
+         
+                Vector2 position = {posXCentered, posYCentered};
+                if (selected[y][x]) {
+                    DrawRectangle(posX, posY, cellSize, cellSize, Fade(BLACK, 0.4f));
+                }
+                DrawTextEx(myFont, letterStr, position, fontSize, 2, BLACK); // Text color
+            }
+        }
+        
+        DrawRectangle(textboxX, textboxY, textboxWidth, textboxHeight, LIGHTGRAY);
+        DrawRectangleLines(textboxX, textboxY, textboxWidth, textboxHeight, BLACK);
+        DrawText("Final Answer:", textboxX + 10, textboxY + 10, 20, DARKGRAY);
+        string displayText = finalAnswerInput;
+        DrawText(displayText.c_str(), textboxX + 150, textboxY + 10, 20, BLACK);
+
+
+        if (answerSubmitted) {
+            if (correctAnswer) {
+                DrawText("Correct!", textboxX + textboxWidth + 10, textboxY + 10, 20, BLACK);
+            } else {
+                DrawText("Try again...", textboxX + textboxWidth + 10, textboxY + 10, 20, BLACK);
+            }
+        }
+
+        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            Vector2 mouse = GetMousePosition();
+        
+            for (int y = 0; y < gridSize; y++) {
+                for (int x = 0; x < gridSize; x++) {
+                    float posX = startX + x * (cellSize + spacing);
+                    float posY = startY + y * (cellSize + spacing);
+                    Rectangle cell = { posX, posY, (float)cellSize, (float)cellSize };
+        
+                    if (CheckCollisionPointRec(mouse, cell)) {
+                        if (!locked[y][x]) {
+                            if (!selected[y][x]) {
+                                // Select only if it's the first cell, or orthogonal to the last selected one
+                                if (selectedPositions.empty() || (abs(x - selectedPositions.back().x) + abs(y - selectedPositions.back().y) == 1)) {
+                                selected[y][x] = true;
+                                selectedPositions.push_back({x, y});
+                                if (isValidSelection(selectedPositions, letterGrid, validWords)) {
+                                    cout << "You found a word!\n";
+                                    // Mark these positions as highlighted
+                                    foundWords.push_back({selectedPositions, nextColorIndex});
+                                    nextColorIndex = (nextColorIndex + 1) % wordColors.size();
+                                    for (const auto& pos : selectedPositions) {
+                                        selected[pos.y][pos.x] = false;
+                                        locked[pos.y][pos.x] = true;
+                                    }
+                                    selectedPositions.clear(); // Reset current selection
+                                    }
+                                }  
+                            } else {
+                                // Deselect only if it's the last selected cell
+                                if (!selectedPositions.empty() && selectedPositions.back().x == x && selectedPositions.back().y == y) {
+                                    selected[y][x] = false;
+                                selectedPositions.pop_back();
+                                }
+                            }
+                        }  
+                    }
+                }
+            }
+        }
+
+        int key = GetCharPressed();
+        while (key > 0) {
+            if (isalpha(key)) {
+                if (finalAnswerInput.length() < maxAnswerLength) {
+                    finalAnswerInput += toupper((char)key);
+                }
+            }
+            key = GetCharPressed();
+        }
+
+        if (IsKeyPressed(KEY_BACKSPACE) && !finalAnswerInput.empty()) {
+            finalAnswerInput.pop_back();
+        }
+
+        if (IsKeyPressed(KEY_ENTER) && !finalAnswerInput.empty()) {
+            answerSubmitted = true;
+            correctAnswer = (finalAnswerInput == finalAnswer);
+        }
+
+        EndDrawing();
+    }
+
+    UnloadFont(myFont);
+    CloseWindow();
+    return 0;
+}
